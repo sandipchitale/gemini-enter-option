@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini App Enter Option",
+  "version": "1.0",
+  "description": "Customize Enter key behavior on gemini.google.com using a slider.",
+  "permissions": [
+    "storage"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["content.js"]
+    }
+  ]
+}
