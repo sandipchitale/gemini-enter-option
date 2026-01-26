@@ -12,3 +12,7 @@ This Chrome extension adds an option to the Gemini app to use Enter key to:
 3. Enable "Developer mode"
 4. Click "Load unpacked"
 5. Select the cloned repository directory
+
+## UI
+
+![Slider](screenshots/screenshot.png)
