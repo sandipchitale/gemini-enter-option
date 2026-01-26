@@ -18,6 +18,13 @@ function updateSwitchState() {
     if (switchUI) {
         const input = switchUI.querySelector('input');
         if (input) input.checked = swapEnter;
+
+        const label = switchUI.querySelector('label');
+        if (label) {
+            label.title = swapEnter 
+                ? "Enter key will add a new line" 
+                : "Enter key will submit the prompt";
+        }
     }
 }
 
@@ -51,9 +58,17 @@ function createSwitchUI() {
 
     // Send Icon
     const sendIcon = document.createElement('span');
-    sendIcon.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>`;
+    const sendSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    sendSvg.setAttribute("width", "16");
+    sendSvg.setAttribute("height", "16");
+    sendSvg.setAttribute("viewBox", "0 0 24 24");
+    sendSvg.setAttribute("fill", "currentColor");
+    const sendPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    sendPath.setAttribute("d", "M2.01 21L23 12 2.01 3 2 10l15 2-15 2z");
+    sendSvg.appendChild(sendPath);
+    sendIcon.appendChild(sendSvg);
     sendIcon.style.display = 'flex';
-    sendIcon.title = 'Send behavior';
+    sendIcon.title = 'Enter will submit the prompt option';
     container.appendChild(sendIcon);
 
     // Switch Control
@@ -66,6 +81,9 @@ function createSwitchUI() {
         margin: 0 4px;
         cursor: pointer;
     `;
+    label.title = swapEnter 
+        ? "Enter key will add a new line" 
+        : "Enter key will submit the prompt";
 
     const input = document.createElement('input');
     input.type = 'checkbox';
@@ -104,9 +122,17 @@ function createSwitchUI() {
 
     // Newline Icon
     const newlineIcon = document.createElement('span');
-    newlineIcon.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 7v4H5.83l3.58-3.59L8 6l-6 6 6 6 1.41-1.41L5.83 13H21V7h-2z"/></svg>`;
+    const newlineSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    newlineSvg.setAttribute("width", "16");
+    newlineSvg.setAttribute("height", "16");
+    newlineSvg.setAttribute("viewBox", "0 0 24 24");
+    newlineSvg.setAttribute("fill", "currentColor");
+    const newlinePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    newlinePath.setAttribute("d", "M19 7v4H5.83l3.58-3.59L8 6l-6 6 6 6 1.41-1.41L5.83 13H21V7h-2z");
+    newlineSvg.appendChild(newlinePath);
+    newlineIcon.appendChild(newlineSvg);
     newlineIcon.style.display = 'flex';
-    newlineIcon.title = 'Newline behavior';
+    newlineIcon.title = 'Enter adds new line option';
     container.appendChild(newlineIcon);
 
     input.addEventListener('change', (e) => {
