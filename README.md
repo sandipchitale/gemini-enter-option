@@ -16,3 +16,11 @@ This Chrome extension adds an option to the Gemini app to use Enter key to:
 ## UI
 
 ![Slider](screenshots/screenshot.png)
+
+## Icon
+
+![Icon](icons/icon512x512.png)
+
+## License
+
+MIT License
