@@ -6,7 +6,11 @@
   "permissions": [
     "storage"
   ],
-
+  "action": {
+    "default_icon": {
+      "512": "icons/icon512x512.png"
+    }
+  },
   "content_scripts": [
     {
       "matches": ["https://gemini.google.com/*"],
