@@ -520,9 +520,14 @@ function inject() {
 
 // --- Observers & Lifecycle ---
 
-// 1. MutationObserver for reactive updates
+// 1. MutationObserver for reactive updates (Debounced)
+let injectTimeout;
 const observer = new MutationObserver((mutations) => {
-    inject();
+    if (injectTimeout) return;
+    injectTimeout = requestAnimationFrame(() => {
+        inject();
+        injectTimeout = null;
+    });
 });
 
 observer.observe(document.body, {
@@ -532,13 +537,14 @@ observer.observe(document.body, {
 
 // 2. Initialization checks
 inject();
-// Periodic check
-setInterval(inject, 2000);
+// Periodic check (Relaxed interval as fallback)
+setInterval(inject, 5000);
 
-// --- Key Event Interception ---
 // --- Key Event Interception ---
 
 const handleKey = (e) => {
+  if (e.key !== 'Enter') return; // FAST PATH: Ignore all non-Enter keys immediately
+  
   if (!swapEnter) return;
   if (!e.isTrusted) return; // Ignore synthetic events we dispatch
 
@@ -558,78 +564,76 @@ const handleKey = (e) => {
       if (!isMessageInput && !isClaudeInput && !isContentEditable) return;
   }
 
-  if (e.key === 'Enter') {
-      // Determine desired action based on Swap state
-      // If Swap is ON: 
-      //   Enter (no shift) -> Newline (Shift+Enter behavior)
-      //   Shift+Enter      -> Submit (Enter behavior)
+  // Determine desired action based on Swap state
+  // If Swap is ON: 
+  //   Enter (no shift) -> Newline (Shift+Enter behavior)
+  //   Shift+Enter      -> Submit (Enter behavior)
+  
+  const isShift = e.shiftKey;
+  
+  if (isShift) {
+      // User pressed Shift+Enter. We want Submit (Enter).
+      // Swallow this event and dispatch a plain Enter.
       
-      const isShift = e.shiftKey;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
       
-      if (isShift) {
-          // User pressed Shift+Enter. We want Submit (Enter).
-          // Swallow this event and dispatch a plain Enter.
+      if (e.type === 'keydown') {
+          const newEvent = new KeyboardEvent('keydown', {
+              key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
+              bubbles: true, cancelable: true, composed: true,
+              shiftKey: false, // REMOVE SHIFT for Submit
+              ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey
+          });
+          target.dispatchEvent(newEvent);
+      }
+  } else {
+      // User pressed Enter. We want Newline (Shift+Enter).
+      // Swallow this event and dispatch Shift+Enter.
+      
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      
+      if (e.type === 'keydown') {
+          // Special handling for ContentEditable (Claude/ProseMirror)
           
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-          
-          if (e.type === 'keydown') {
-              const newEvent = new KeyboardEvent('keydown', {
-                  key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
-                  bubbles: true, cancelable: true, composed: true,
-                  shiftKey: false, // REMOVE SHIFT for Submit
-                  ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey
-              });
-              target.dispatchEvent(newEvent);
-          }
-      } else {
-          // User pressed Enter. We want Newline (Shift+Enter).
-          // Swallow this event and dispatch Shift+Enter.
-          
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-          
-          if (e.type === 'keydown') {
-              // Special handling for ContentEditable (Claude/ProseMirror)
-              
-              if (currentSite === SITES.CLAUDE || currentSite === SITES.CHATGATE) {
-                  // Dispatch a synthetic Shift+Enter keydown
-                  const shiftEnterDown = new KeyboardEvent('keydown', {
-                      key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
-                      bubbles: true, cancelable: true, composed: true,
-                      shiftKey: true, // ADD SHIFT for Newline
-                      ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey,
-                      view: window
-                  });
-                  target.dispatchEvent(shiftEnterDown);
-                  
-                  // Some editors need a keypress too
-                  const shiftEnterPress = new KeyboardEvent('keypress', {
-                      key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
-                      bubbles: true, cancelable: true, composed: true,
-                      shiftKey: true, 
-                      view: window
-                  });
-                  target.dispatchEvent(shiftEnterPress);
-
-                  // If standard events fail, try inserting a newline text node manually
-                  // But carefully, as this desyncs virtual DOMs. 
-                  // Let's rely on the events first. If this still fails, 
-                  // we might need to simulate 'beforeinput' with insertLineBreak.
-                  
-                  return;
-              }
-
-              const newEvent = new KeyboardEvent('keydown', {
+          if (currentSite === SITES.CLAUDE || currentSite === SITES.CHATGATE) {
+              // Dispatch a synthetic Shift+Enter keydown
+              const shiftEnterDown = new KeyboardEvent('keydown', {
                   key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
                   bubbles: true, cancelable: true, composed: true,
                   shiftKey: true, // ADD SHIFT for Newline
-                  ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey
+                  ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey,
+                  view: window
               });
-              target.dispatchEvent(newEvent);
+              target.dispatchEvent(shiftEnterDown);
+              
+              // Some editors need a keypress too
+              const shiftEnterPress = new KeyboardEvent('keypress', {
+                  key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
+                  bubbles: true, cancelable: true, composed: true,
+                  shiftKey: true, 
+                  view: window
+              });
+              target.dispatchEvent(shiftEnterPress);
+
+              // If standard events fail, try inserting a newline text node manually
+              // But carefully, as this desyncs virtual DOMs. 
+              // Let's rely on the events first. If this still fails, 
+              // we might need to simulate 'beforeinput' with insertLineBreak.
+              
+              return;
           }
+
+          const newEvent = new KeyboardEvent('keydown', {
+              key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
+              bubbles: true, cancelable: true, composed: true,
+              shiftKey: true, // ADD SHIFT for Newline
+              ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey
+          });
+          target.dispatchEvent(newEvent);
       }
   }
 };
