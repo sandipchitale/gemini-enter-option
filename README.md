@@ -15,7 +15,17 @@ This Chrome extension adds an option to the Gemini app to use Enter key to:
 
 ## UI
 
-![Slider](screenshots/screenshot.png)
+### Gemini
+
+![Gemini](screenshots/screenshot-gemini.png)
+
+### ChatGPT
+
+![ChatGPT](screenshots/screenshot-chatgpt.png)
+
+### Claude
+
+![Claude](screenshots/screenshot-claude.png)
 
 ## Icon
 
