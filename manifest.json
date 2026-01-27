@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Gemini App Enter Option",
-  "version": "1.0",
-  "description": "Customize Enter key behavior on gemini.google.com using a slider.",
+  "name": "AI Chat Enter Option",
+  "version": "1.3",
+  "description": "Customize Enter key behavior on gemini.google.com, chatgpt.com and claude.ai using a slider.",
   "permissions": [
     "storage"
   ],
@@ -13,7 +13,11 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://gemini.google.com/*"],
+      "matches": [
+        "https://gemini.google.com/*",
+        "https://claude.ai/*",
+        "https://chatgpt.com/*"
+      ],
       "js": ["content.js"]
     }
   ]
