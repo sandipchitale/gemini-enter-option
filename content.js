@@ -44,8 +44,8 @@ function updateSwitchState() {
         const label = switchUI.querySelector('label');
         if (label) {
             label.title = swapEnter 
-                ? "Enter key will add a new line" 
-                : "Enter key will submit the prompt";
+                ? "Enter key will add a new line (Ctrl+Enter to toggle)" 
+                : "Enter key will submit the prompt (Ctrl+Enter to toggle)";
         }
     }
 }
@@ -118,8 +118,8 @@ function createSwitchUI() {
         cursor: pointer;
     `;
     label.title = swapEnter 
-        ? "Enter key will add a new line" 
-        : "Enter key will submit the prompt";
+        ? "Enter key will add a new line (Ctrl+Enter to toggle)" 
+        : "Enter key will submit the prompt (Ctrl+Enter to toggle)";
 
     const input = document.createElement('input');
     input.type = 'checkbox';
@@ -544,6 +544,23 @@ setInterval(inject, 5000);
 
 const handleKey = (e) => {
   if (e.key !== 'Enter') return; // FAST PATH: Ignore all non-Enter keys immediately
+
+  // Toggle shortcut: Ctrl+Enter (or Cmd+Enter on Mac)
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+      // Prevent default action and propagation
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      // Only act on keydown to avoid double-toggling
+      if (e.type === 'keydown') {
+          const newState = !swapEnter;
+          swapEnter = newState;
+          updateSwitchState();
+          chrome.storage.sync.set({ swapEnter: newState });
+      }
+      return;
+  }
   
   if (!swapEnter) return;
   if (!e.isTrusted) return; // Ignore synthetic events we dispatch
