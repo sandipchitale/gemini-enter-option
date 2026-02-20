@@ -545,8 +545,8 @@ setInterval(inject, 5000);
 const handleKey = (e) => {
   if (e.key !== 'Enter') return; // FAST PATH: Ignore all non-Enter keys immediately
 
-  // Toggle shortcut: Ctrl+Enter (or Cmd+Enter on Mac)
-  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+  // Toggle shortcut: Ctrl+Enter for all platforms
+  if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
       // Prevent default action and propagation
       e.preventDefault();
       e.stopPropagation();
