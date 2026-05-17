@@ -420,90 +420,48 @@ function injectChatGate(ui) {
 }
 
 function injectClaude(ui) {
-    // Strategy for Claude:
-    // Support two states:
-    // 1. "Pill" mode (input + buttons in one row)
-    // 2. Multiline mode (check if buttons are separate)
-    
-    // Main text area for context
-    const inputArea = document.querySelector('[contenteditable="true"]');
-    
-    if (inputArea) {
-        // Find the "Send message" button
-        // Claude uses an aria-label="Send message"
-        const sendBtn = document.querySelector('button[aria-label="Send message"]');
-        
-        if (sendBtn) {
-            // The Send button is usually wrapped in a div, which might be wrapped in another div.
-            // We want to be in the same flex container as the send button (or its wrapper).
-            
-            // In the provided DOM: 
-            // <div class="flex gap-2 w-full items-center">
-            //    <div class="relative flex-1 ...">...</div>  (Input/Left controls)
-            //    <div class="overflow-hidden list-none p-1 ..."> (Model Selector)
-            //    <div style="opacity: 1; transform: none;"> (Send Button Wrapper)
-            
-            // So we want to engage with the container holding these items.
-            
-            // Traverse up from Send Button to find the best insertion point.
-            // Usually we want to be to the LEFT of the Send button (or the Model Selector if present).
-            
-            let targetGroup = sendBtn.parentElement;
-            
-            // Go up until we hit the main toolbar container (flex row)
-            // Heuristic: check if parent has class "flex" and "items-center" or similar layout
-            
-            // Let's look for the main container that holds the input input area's sibling
-            // Actually, in the provided DOM, the input area is in a separate upper div, 
-            // and the toolbar is below it? 
-            // "flex flex-col m-3.5 gap-3" -> "relative" (input) -> "flex gap-2 w-full items-center" (toolbar)
-            
-            // So we want to find that "flex gap-2 w-full items-center" container.
-            
-            const toolbar = inputArea.closest('.flex.flex-col').querySelector('.flex.gap-2.w-full.items-center');
-            
-            if (toolbar) {
-                 // The toolbar children are:
-                 // 1. Left side (Attachment icon, etc.)
-                 // 2. Model Selector (maybe)
-                 // 3. Send Button (maybe wrapped)
-                 
-                 // We want to insert validly into this flex container.
-                 // Ideally before the Model Selector or the Send Button group.
-                 
-                 // Find the child that contains the send button
-                 let sendContainer = Array.from(toolbar.children).find(c => c.contains(sendBtn));
-                 
-                 // Find model selector if exists
-                 const modelSelector = Array.from(toolbar.children).find(c => 
-                    c.querySelector('[data-testid="model-selector-dropdown"]')
-                 );
-                 
-                 let insertionPoint = modelSelector || sendContainer;
-                 
-                 if (insertionPoint && !toolbar.contains(ui)) {
-                     // Styles
-                     ui.style.height = 'auto'; 
-                     ui.style.minHeight = 'auto';
-                     ui.style.margin = '0 8px 0 auto'; // Auto left to push right, or regular margin
-                     ui.style.padding = '0';
-                     ui.style.backgroundColor = 'transparent';
-                     ui.style.alignSelf = 'center';
-                     ui.style.display = 'flex';
-                     ui.style.flexShrink = '0';
-                     ui.style.color = 'inherit';
-                     ui.style.opacity = '0.7'; // Match Claude's muted aesthetic
-                     
-                     toolbar.insertBefore(ui, insertionPoint);
-                 }
-            } else {
-                // Fallback: direct parent of send button wrapper?
-                if (targetGroup && !targetGroup.contains(ui)) {
-                     ui.style.marginRight = '8px';
-                     targetGroup.parentElement.insertBefore(ui, targetGroup);
-                }
-            }
+    // Anchor on the model selector — always present in the bottom toolbar row,
+    // unlike the send button (only appears when text is entered) which causes
+    // findClaudeToolbar to stop at a small inner flex container instead of the
+    // real toolbar, scrambling the UI.
+    const modelSelector = document.querySelector('button[data-testid="model-selector-dropdown"]');
+    if (!modelSelector) return;
+
+    // Walk up from the model selector to find the flex toolbar row.
+    let toolbar = modelSelector.parentElement;
+    while (toolbar && toolbar !== document.body) {
+        const style = window.getComputedStyle(toolbar);
+        if ((style.display === 'flex' || style.display === 'inline-flex') && toolbar.children.length >= 2) {
+            break;
         }
+        toolbar = toolbar.parentElement;
+    }
+    if (!toolbar || toolbar === document.body || toolbar.contains(ui)) return;
+
+    // Find the model selector's direct-child-of-toolbar ancestor.
+    let modelSelectorContainer = modelSelector;
+    while (modelSelectorContainer.parentElement !== toolbar) {
+        modelSelectorContainer = modelSelectorContainer.parentElement;
+        if (!modelSelectorContainer || modelSelectorContainer === document.body) return;
+    }
+
+    // Insert between the model selector container and the voice/send area (its next sibling).
+    ui.style.height = 'auto';
+    ui.style.minHeight = 'auto';
+    ui.style.margin = '0 8px';
+    ui.style.padding = '0';
+    ui.style.backgroundColor = 'transparent';
+    ui.style.alignSelf = 'center';
+    ui.style.display = 'flex';
+    ui.style.flexShrink = '0';
+    ui.style.color = 'inherit';
+    ui.style.opacity = '0.7';
+
+    const insertionPoint = modelSelectorContainer.nextElementSibling;
+    if (insertionPoint) {
+        toolbar.insertBefore(ui, insertionPoint);
+    } else {
+        toolbar.appendChild(ui);
     }
 }
 
@@ -590,13 +548,18 @@ const handleKey = (e) => {
   
   if (isShift) {
       // User pressed Shift+Enter. We want Submit (Enter).
-      // Swallow this event and dispatch a plain Enter.
-      
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      
+
       if (e.type === 'keydown') {
+          // For Claude: clicking the send button is more reliable than synthetic keyboard events
+          if (currentSite === SITES.CLAUDE) {
+              const sendBtn = document.querySelector('button[aria-label="Send message"]');
+              if (sendBtn && !sendBtn.disabled) sendBtn.click();
+              return;
+          }
+
           const newEvent = new KeyboardEvent('keydown', {
               key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
               bubbles: true, cancelable: true, composed: true,
@@ -615,32 +578,27 @@ const handleKey = (e) => {
       
       if (e.type === 'keydown') {
           // Special handling for ContentEditable (Claude/ProseMirror)
-          
+
           if (currentSite === SITES.CLAUDE || currentSite === SITES.CHATGATE) {
-              // Dispatch a synthetic Shift+Enter keydown
+              // Use the W3C InputEvent API — React and ProseMirror-based editors handle this.
+              // This is more reliable than synthetic keyboard events for rich text editors.
+              const lineBreakEvent = new InputEvent('beforeinput', {
+                  inputType: 'insertLineBreak',
+                  bubbles: true,
+                  cancelable: true
+              });
+              target.dispatchEvent(lineBreakEvent);
+
+              // Fallback: synthetic Shift+Enter for editors that rely on keyboard events
               const shiftEnterDown = new KeyboardEvent('keydown', {
                   key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
                   bubbles: true, cancelable: true, composed: true,
-                  shiftKey: true, // ADD SHIFT for Newline
+                  shiftKey: true,
                   ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey,
                   view: window
               });
               target.dispatchEvent(shiftEnterDown);
-              
-              // Some editors need a keypress too
-              const shiftEnterPress = new KeyboardEvent('keypress', {
-                  key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
-                  bubbles: true, cancelable: true, composed: true,
-                  shiftKey: true, 
-                  view: window
-              });
-              target.dispatchEvent(shiftEnterPress);
 
-              // If standard events fail, try inserting a newline text node manually
-              // But carefully, as this desyncs virtual DOMs. 
-              // Let's rely on the events first. If this still fails, 
-              // we might need to simulate 'beforeinput' with insertLineBreak.
-              
               return;
           }
 
