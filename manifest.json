@@ -6,8 +6,19 @@
   "permissions": [
     "storage"
   ],
+  "icons": {
+    "16": "icons/icon512x512.png",
+    "32": "icons/icon512x512.png",
+    "48": "icons/icon512x512.png",
+    "128": "icons/icon512x512.png",
+    "512": "icons/icon512x512.png"
+  },
   "action": {
     "default_icon": {
+      "16": "icons/icon512x512.png",
+      "32": "icons/icon512x512.png",
+      "48": "icons/icon512x512.png",
+      "128": "icons/icon512x512.png",
       "512": "icons/icon512x512.png"
     }
   },
@@ -16,7 +27,9 @@
       "matches": [
         "https://gemini.google.com/*",
         "https://claude.ai/*",
-        "https://chatgpt.com/*"
+        "https://*.claude.ai/*",
+        "https://chatgpt.com/*",
+        "https://*.chatgpt.com/*"
       ],
       "js": ["content.js"]
     }

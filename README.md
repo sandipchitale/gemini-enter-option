@@ -1,9 +1,9 @@
-# Gemini App Enter Option Chrome Extension
+# AI Chat Enter Option Chrome Extension
 
-This Chrome extension adds an option to the Gemini app to use Enter key to:
+This Chrome extension adds an option to Gemini, ChatGPT, and Claude to use the Enter key to:
 
 - add a new line (and Shift+Enter to submit the prompt)
-- submit the prompt (and Shift+Enter to add a new line) ( this matches the behavior of Gemini App )
+- submit the prompt (and Shift+Enter to add a new line)
 
 ## Installation
 

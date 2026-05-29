@@ -224,169 +224,145 @@ function injectGemini(ui) {
 }
 
 function injectChatGPT(ui) {
-    // Strategy: Append to the footer area [grid-area:footer]
-    // The footer usually contains attachment/search buttons.
-    
-    // Try multiple selectors for the footer
+    const textarea = document.getElementById('prompt-textarea');
+    if (!textarea) return;
+
+    // Walk up from textarea to find the local container enclosing the input and its buttons/actions.
+    // This scopes all queries safely to the input area and avoids matching chat history.
+    let container = null;
+    let current = textarea;
+    for (let i = 0; i < 5; i++) {
+        if (!current.parentElement) break;
+        const parent = current.parentElement;
+        const lastChild = parent.lastElementChild;
+        if (lastChild && !lastChild.contains(textarea) && lastChild !== textarea) {
+            if (lastChild.tagName === 'BUTTON' || lastChild.querySelector('button') || lastChild.querySelector('svg')) {
+                container = parent;
+                break;
+            }
+        }
+        current = parent;
+    }
+
+    if (!container) {
+        container = textarea.parentElement;
+    }
+    if (!container) return;
+
+    // Try multiple selectors for the footer area specifically inside the scoped container
     const separators = [
-        '.\\\\[grid-area\\\\:footer\\\\]', // Escaped for JS string to produce CSS selector .\[grid-area\:footer\]
+        '[class~="[grid-area:footer]"]',
         '[data-testid="composer-footer"]',
         '.flex.items-end.gap-2'
     ];
 
     let footer = null;
-    try {
-        footer = document.querySelector('.\\\\[grid-area\\\\:footer\\\\]');
-    } catch (e) {
-        // Ignore selector errors
-    }
-
-    if (!footer) {
-        // Fallback: finding sibling of the textarea
-        const textarea = document.getElementById('prompt-textarea');
-        if (textarea) {
-            // The footer is usually a sibling in the grid
-            const grid = textarea.closest('.grid');
-            if (grid) {
-                // Try to find the element that matches footer characteristics
-                for (let child of grid.children) {
-                    const style = window.getComputedStyle(child);
-                    if (style.gridArea === 'footer') {
-                        footer = child;
-                        break;
-                    }
-                }
-            }
+    for (const selector of separators) {
+        try {
+            footer = container.querySelector(selector);
+            if (footer) break;
+        } catch (e) {
+            // Ignore selector errors
         }
     }
 
     if (footer) {
         // Footer exists (Attach mode)
-        // Try to place it next to the Voice button (usually on the right) for consistency
-        
-        // Look for the voice button
-        // It usually has "Voice" text or specific aria labels
+        // Try to place it next to the Voice/Send button (usually on the right) for consistency
         const voiceBtn = Array.from(footer.children).find(child => 
             child.textContent.includes('Voice') || 
             child.querySelector('svg') && !child.textContent.includes('Attach') // Heuristic: icon button that isn't attach
         );
         
         if (!footer.contains(ui)) {
-            // Check if footer is flex
-            const style = window.getComputedStyle(footer);
             ui.style.height = 'auto'; // Reset heights
             ui.style.margin = '0 8px'; // Add generic spacing
             
             if (voiceBtn) {
                  // Insert before the voice button (placing it to its left)
                  footer.insertBefore(ui, voiceBtn);
-                 // If flex, align center
                  ui.style.alignSelf = 'center';
             } else {
-                // If can't find voice button, just append to end (Right side usually)
-                // If flex row, this puts it on the far right.
-                footer.appendChild(ui);
-                ui.style.marginLeft = 'auto'; // Pushes it to the right if flex
+                 // If can't find voice button, just append to end (Right side usually)
+                 footer.appendChild(ui);
+                 ui.style.marginLeft = 'auto'; // Pushes it to the right if flex
             }
         }
     } else {
-        // Fallback for "Search/New Chat" mode (Pill layout)
-        const textarea = document.getElementById('prompt-textarea');
-        if (textarea) {
-            // Strategy: 
-            // 1. Traverse parents to find the "Pill" container.
-            //    The Pill container is characterized by having the input area AND some buttons on the right (Mic, Send).
-            //    So, the Pill's `lastElementChild` should definitively be a button or a group of buttons.
+        // Fallback for "Search/New Chat" mode or standard Pill layout
+        // First try to locate the grid trailing area if it exists within the container
+        const trailing = container.querySelector('[class~="[grid-area:trailing]"]') || 
+                         container.querySelector('[grid-area="trailing"]');
+        
+        if (trailing) {
+            // Locate the button group inside trailing area, typically a div with flex items
+            const buttonGroup = trailing.querySelector('.flex') || trailing;
             
-            let pillContainer = null;
-            let current = textarea;
-            
-            for (let i = 0; i < 5; i++) {
-                if (!current.parentElement) break;
-                const parent = current.parentElement;
-                
-                const lastChild = parent.lastElementChild;
-                
-                // If the last child is the textarea (or its wrapper), then this parent likely 
-                // doesn't contain the right-side buttons we are looking for. Keep going up.
-                if (lastChild && !lastChild.contains(textarea) && lastChild !== textarea) {
-                     // Check if this last child looks like it contains generic buttons/actions
-                     // (Heuristic: it's a button or has buttons inside)
-                     if (lastChild.tagName === 'BUTTON' || lastChild.querySelector('button') || lastChild.querySelector('svg')) {
-                         pillContainer = parent;
-                         break;
-                     }
+            if (!buttonGroup.contains(ui)) {
+                ui.style.height = 'auto'; 
+                ui.style.minHeight = 'auto';
+                ui.style.margin = '0 6px';
+                ui.style.padding = '0';
+                ui.style.backgroundColor = 'transparent';
+                ui.style.alignSelf = 'center';
+                ui.style.display = 'flex';
+                ui.style.flexShrink = '0';
+                ui.style.color = 'inherit';
+
+                if (buttonGroup.firstElementChild) {
+                    buttonGroup.insertBefore(ui, buttonGroup.firstElementChild);
+                } else {
+                    buttonGroup.appendChild(ui);
                 }
-                current = parent;
+            }
+        } else {
+            // No trailing area found, inject relative to the buttons at the end of the container
+            let target = container.lastElementChild;
+            let insertMode = 'insertBefore'; // or 'prepend' if targeting a group
+            
+            if (target.tagName !== 'BUTTON' && target.children.length > 0) {
+                // It's likely a wrapper group.
+                insertMode = 'prepend';
+            } else {
+                // It's likely a loose list of buttons
+                let candidate = target;
+                while (candidate.previousElementSibling) {
+                    const prev = candidate.previousElementSibling;
+                    if (prev.contains(textarea) || prev === textarea) {
+                        break; // Stop, we hit the input
+                    }
+                    if (prev.tagName === 'BUTTON' || prev.querySelector('button') || prev.querySelector('svg')) {
+                         candidate = prev; // Move target left to this button
+                    } else {
+                        break; // Unknown separator
+                    }
+                }
+                target = candidate;
+                insertMode = 'insertBefore';
             }
 
-            if (pillContainer) {
-                // We have the container. Now determine exact insertion point.
-                // We want to be to the LEFT of the Right-Side controls (Mic, Send).
-                // The Right-Side controls typically end at `pillContainer.lastElementChild`.
-                
-                let target = pillContainer.lastElementChild;
-                let insertMode = 'insertBefore'; // or 'prepend' if targeting a group
-                
-                // Check if the last element is a wrapper group (e.g. div holding Mic+Send)
-                // or just the last button (e.g. Send).
-                
-                if (target.tagName !== 'BUTTON' && target.children.length > 0) {
-                    // It's likely a wrapper group.
-                    // We want to be inside this group, at the start (Left of Mic).
-                    insertMode = 'prepend';
-                } else {
-                    // It's likely a loose list of buttons (e.g. ... [Mic] [Send]).
-                    // Walk backwards from the last child to find the start of this button run.
-                    // We stop when we hit the textarea (or its wrapper) or something that isn't a button.
-                    
-                    let candidate = target;
-                    while (candidate.previousElementSibling) {
-                        const prev = candidate.previousElementSibling;
-                        if (prev.contains(textarea) || prev === textarea) {
-                            break; // Stop, we hit the input
-                        }
-                        if (prev.tagName === 'BUTTON' || prev.querySelector('button') || prev.querySelector('svg')) {
-                             candidate = prev; // Move target left to this button (e.g. Send -> Mic)
-                        } else {
-                            break; // Unknown separator
-                        }
-                    }
-                    target = candidate; // This should be the Mic button
-                    insertMode = 'insertBefore';
-                }
+            const parentOfTarget = (insertMode === 'prepend') ? target : container;
+            
+            if (!parentOfTarget.contains(ui)) {
+                 // Styling
+                 ui.style.height = 'auto'; 
+                 ui.style.minHeight = 'auto';
+                 ui.style.margin = '0 6px'; // Balanced spacing
+                 ui.style.padding = '0';
+                 ui.style.backgroundColor = 'transparent';
+                 ui.style.alignSelf = 'center';
+                 ui.style.display = 'flex';
+                 ui.style.flexShrink = '0';
+                 ui.style.color = 'inherit';
 
-                const parentOfTarget = (insertMode === 'prepend') ? target : pillContainer;
-                
-                if (!parentOfTarget.contains(ui)) {
-                     // Styling
-                     ui.style.height = 'auto'; 
-                     ui.style.minHeight = 'auto';
-                     ui.style.margin = '0 6px'; // Balanced spacing
-                     ui.style.padding = '0';
-                     ui.style.backgroundColor = 'transparent';
-                     ui.style.alignSelf = 'center';
-                     ui.style.display = 'flex';
-                     ui.style.flexShrink = '0';
-                     ui.style.color = 'inherit';
-
-                     if (insertMode === 'prepend') {
-                         if (target.firstElementChild) {
-                             target.insertBefore(ui, target.firstElementChild);
-                         } else {
-                             target.appendChild(ui);
-                         }
-                     } else {
-                         pillContainer.insertBefore(ui, target);
-                     }
-                }
-            } else {
-                 // Last ditch fallback
-                 const directParent = textarea.parentElement;
-                 if (directParent && !directParent.contains(ui)) {
-                     directParent.style.display = 'flex'; 
-                     directParent.style.flexWrap = 'wrap'; 
-                     directParent.appendChild(ui);
+                 if (insertMode === 'prepend') {
+                      if (target.firstElementChild) {
+                          target.insertBefore(ui, target.firstElementChild);
+                      } else {
+                          target.appendChild(ui);
+                      }
+                 } else {
+                      container.insertBefore(ui, target);
                  }
             }
         }
